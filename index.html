@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Contenidos Monarch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: una columna tipo cronograma de publicación; la marca activa tiñe el acento. */
+:root {
+  --bg: #f4f3f1;
+  --surface: #ffffff;
+  --fg: #1b1a19;
+  --muted: #6c6862;
+  --line: #e2dfda;
+  --ac: #c8102e;
+  --pf: #4d8a12;
+  --accent: var(--ac);
+  --on-accent: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141312; --surface: #1e1c1b; --fg: #f1efec; --muted: #a39e97; --line: #34312e;
+    --ac: #ff4d5e; --pf: #9bd44a; --on-accent: #141312; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141312; --surface: #1e1c1b; --fg: #f1efec; --muted: #a39e97; --line: #34312e;
+  --ac: #ff4d5e; --pf: #9bd44a; --on-accent: #141312; color-scheme: dark;
+}
+body[data-brand="pf"] { --accent: var(--pf); }
+body[data-brand="ac"] { --accent: var(--ac); }
+
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body {
+  margin: 0; padding-top: env(safe-area-inset-top, 0px);
+  background: var(--bg); color: var(--fg);
+  font-family: var(--body); font-size: 16px; line-height: 1.5;
+  padding-inline: 16px; padding-block: 0 48px;
+}
+.wrap { max-width: 560px; margin: 0 auto; }
+
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg);
+  padding-block: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.month {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.month h1 {
+  font-family: var(--display); font-weight: 700; font-size: 2.1rem; line-height: 1;
+  text-transform: uppercase; letter-spacing: .01em; margin: 0;
+}
+.month .tag {
+  font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted);
+}
+.tabs { display: flex; gap: 4px; margin-top: 16px; }
+.tab {
+  flex: 1; appearance: none; border: 0; background: none; cursor: pointer;
+  font-family: var(--display); font-weight: 700; font-size: 1.15rem; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--muted);
+  padding: 10px 8px 12px; border-bottom: 4px solid transparent;
+}
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.tab .n { font-family: var(--body); font-weight: 600; font-size: .8rem; margin-left: 6px; opacity: .7; }
+
+.note {
+  margin-top: 16px; font-size: .85rem; color: var(--muted);
+  border-left: 3px solid var(--line); padding-left: 12px;
+}
+
+.feed { display: flex; flex-direction: column; gap: 28px; margin-top: 24px; }
+.post { display: flex; flex-direction: column; gap: 12px; }
+.when {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--display); font-weight: 600; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .04em;
+}
+.when .day { color: var(--accent); }
+.chip {
+  font-family: var(--body); font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted);
+}
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.media { display: block; width: 100%; max-width: 100%; height: auto; background: var(--line); }
+.media.vert { aspect-ratio: 9 / 16; object-fit: cover; }
+.caption {
+  margin: 0; padding: 14px 16px; white-space: pre-wrap; font-size: .95rem; min-width: 0; overflow-wrap: anywhere;
+}
+.actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 16px 16px; }
+.btn {
+  appearance: none; cursor: pointer; font-family: var(--body); font-weight: 600; font-size: .95rem;
+  border-radius: 8px; padding: 11px 14px; border: 1px solid var(--line); background: transparent; color: var(--fg);
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); flex: 1 1 220px; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.empty { margin-top: 32px; color: var(--muted); }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(100% - 32px); background: var(--fg); color: var(--bg);
+  padding: 12px 16px; border-radius: 10px; font-size: .9rem; z-index: 10;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: rise .2s ease-out; }
+  @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+}
+</style>
+</head>
+<body data-brand="ac">
+<div class="wrap">
+  <header class="top">
+    <div class="month">
+      <h1 id="monthTitle"></h1>
+      <span class="tag" id="monthTag"></span>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tab-ac" role="tab" aria-selected="true" data-brand="ac">American Cola<span class="n" id="n-ac"></span></button>
+      <button class="tab" id="tab-pf" role="tab" aria-selected="false" data-brand="pf">Planet Fruit<span class="n" id="n-pf"></span></button>
+    </div>
+  </header>
+
+  <p class="note" id="note">Tocá <strong>Compartir</strong> y elegí WhatsApp: se manda la pieza con su texto. El texto además queda copiado, por si WhatsApp no lo incluye (pasa en iPhone): pegalo antes de enviar.</p>
+
+  <main class="feed" id="feed" role="tabpanel"></main>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="posteos.js"></script>
+<script>
+const MONTH = window.MONTH || { title: "", tag: "" };
+const POSTS = window.POSTS || [];
+const TYPE_LABEL = { feed: "Feed", reel: "Reel", historia: "Historia" };
+const BRAND_SLUG = { ac: "american-cola", pf: "planet-fruit" };
+const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const MIME = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", mp4: "video/mp4", webm: "video/webm" };
+
+/* Los archivos se precargan para que el toque en Compartir abra el menú del celular al instante. */
+const fileCache = new Map();
+function getFile(p) {
+  if (!fileCache.has(p.file)) {
+    const ext = p.file.split(".").pop().toLowerCase();
+    const name = baseName(p) + "." + ext;
+    fileCache.set(p.file, fetch(p.file)
+      .then(r => { if (!r.ok) throw new Error("missing"); return r.blob(); })
+      .then(b => { const f = new File([b], name, { type: MIME[ext] || b.type }); fileCache.set(p.file, f); return f; })
+      .catch(() => { fileCache.delete(p.file); return null; }));
+  }
+  return fileCache.get(p.file);
+}
+
+let brand = "ac";
+try { const s = localStorage.getItem("monarch-brand"); if (s === "ac" || s === "pf") brand = s; } catch (e) {}
+if (location.hash === "#planet") brand = "pf";
+if (location.hash === "#american") brand = "ac";
+
+function fmtDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return { day: DAYS[dt.getDay()] + " " + d, month: MONTHS[m - 1] };
+}
+function baseName(p) { return BRAND_SLUG[p.brand] + "-" + p.date + "-" + p.type; }
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { t.hidden = true; }, 4500);
+}
+function selectText(el) {
+  const r = document.createRange(); r.selectNodeContents(el);
+  const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function copyCaption(text, el) {
+  try { return navigator.clipboard.writeText(text).then(() => true, () => { selectText(el); return false; }); }
+  catch (e) { selectText(el); return Promise.resolve(false); }
+}
+function saveFile(file) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a"); a.href = url; a.download = file.name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function canShareFile(f) {
+  try { return !!(f && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; }
+}
+
+async function share(p, cap) {
+  const copied = copyCaption(p.caption, cap);
+  let f = fileCache.get(p.file);
+  if (!(f instanceof File)) f = await getFile(p);
+  if (canShareFile(f)) {
+    try {
+      await navigator.share({ files: [f], text: p.caption });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+    }
+  }
+  if (f) {
+    saveFile(f);
+    const ok = await copied;
+    showToast(ok ? "Pieza descargada y texto copiado. Abrí WhatsApp y adjuntala." : "Pieza descargada. Copiá el texto seleccionado.");
+  } else {
+    showToast("No se pudo cargar la pieza. Revisá la conexión y probá de nuevo.");
+  }
+}
+
+function render() {
+  document.body.dataset.brand = brand;
+  document.getElementById("monthTitle").textContent = MONTH.title;
+  const tag = document.getElementById("monthTag"); tag.textContent = MONTH.tag || ""; tag.hidden = !MONTH.tag;
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.brand === brand)));
+  ["ac", "pf"].forEach(k => { document.getElementById("n-" + k).textContent = POSTS.filter(p => p.brand === k).length; });
+
+  const feed = document.getElementById("feed");
+  feed.setAttribute("aria-labelledby", "tab-" + brand);
+  feed.replaceChildren();
+  const list = POSTS.filter(p => p.brand === brand).sort((a, b) => a.date.localeCompare(b.date));
+  if (!list.length) {
+    const e = document.createElement("p"); e.className = "empty";
+    e.textContent = "Todavía no hay piezas cargadas para esta marca este mes.";
+    feed.append(e); return;
+  }
+  list.forEach(p => {
+    getFile(p);
+    const art = document.createElement("article"); art.className = "post";
+    const f = fmtDate(p.date);
+    const when = document.createElement("div"); when.className = "when";
+    const day = document.createElement("span"); day.className = "day"; day.textContent = f.day;
+    const mon = document.createElement("span"); mon.textContent = f.month;
+    const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = TYPE_LABEL[p.type] || p.type;
+    when.append(day, mon, chip);
+
+    const card = document.createElement("div"); card.className = "card";
+    const isVideo = /\.(mp4|webm)$/i.test(p.file);
+    const media = document.createElement(isVideo ? "video" : "img");
+    if (isVideo) { media.controls = true; media.playsInline = true; media.preload = "metadata"; }
+    else { media.loading = "lazy"; media.alt = p.caption.split("\n")[0]; }
+    media.src = p.file; media.className = "media" + (p.type === "feed" ? "" : " vert");
+
+    const cap = document.createElement("p"); cap.className = "caption"; cap.textContent = p.caption;
+    const actions = document.createElement("div"); actions.className = "actions";
+    const main = document.createElement("button"); main.className = "btn primary"; main.textContent = "Compartir";
+    const dl = document.createElement("button"); dl.className = "btn"; dl.textContent = isVideo ? "Descargar video" : "Descargar foto";
+    const copy = document.createElement("button"); copy.className = "btn"; copy.textContent = "Copiar texto";
+
+    main.addEventListener("click", () => share(p, cap));
+    dl.addEventListener("click", async () => {
+      const file = await getFile(p);
+      if (file) { saveFile(file); showToast("Descargando."); } else showToast("No se pudo cargar la pieza.");
+    });
+    copy.addEventListener("click", async () => {
+      const ok = await copyCaption(p.caption, cap);
+      showToast(ok ? "Texto copiado." : "Texto seleccionado: copialo desde el menú del celular.");
+    });
+    actions.append(main, dl, copy);
+    card.append(media, cap, actions);
+    art.append(when, card);
+    feed.append(art);
+  });
+}
+
+document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
+  brand = b.dataset.brand;
+  try { localStorage.setItem("monarch-brand", brand); } catch (e) {}
+  render(); window.scrollTo({ top: 0 });
+}));
+render();
+</script>
+</body>
+</html>

@@ -6,10 +6,10 @@ Link: https://cdalimentos2026.github.io/monarch-posteos/
 
 ## Cómo se carga cada mes
 
-Barbi sube las piezas en Drive, dentro de la carpeta compartida **Monarch**:
+Barbi sube las piezas finales en Drive, en la carpeta **Monarch / 2 · Posteos** (la única compartida por link; manuales, estrategia y borradores van en **1 · Interno**, privada):
 
 ```
-Monarch / Posteos Monarch /
+Monarch / 2 · Posteos /
    2026-10 Octubre /
       Captions 2026-10        ← Google Sheet: marca | fecha | tipo | archivo | caption
       American Cola /

@@ -9,18 +9,23 @@ Link: https://cdalimentos2026.github.io/monarch-posteos/
 Barbi sube las piezas en Drive, dentro de la carpeta compartida **Monarch**:
 
 ```
-Monarch / American Cola / 2026-10 Octubre /
-   2026-10-03_feed.jpg
-   2026-10-07_reel.mp4
-   2026-10-10_historia.jpg
-   Captions   ← Google Sheet con columnas: fecha | tipo | caption
+Monarch / Posteos Monarch /
+   2026-10 Octubre /
+      Captions 2026-10        ← Google Sheet: marca | fecha | tipo | archivo | caption
+      American Cola /
+         2026-10-03_feed.jpg
+         2026-10-07_reel.mp4
+         2026-10-10_historia.jpg
+      Planet Fruit /
+         2026-10-05_feed.jpg
+   2026-11 Noviembre /
 ```
 
-Lo mismo en `Monarch / Planet Fruit / 2026-10 Octubre /`.
-
-- Nombre de cada archivo: `AAAA-MM-DD_tipo`. Tipos válidos: `feed`, `reel`, `historia`.
+- Nombre de cada archivo: `AAAA-MM-DD_tipo`, con la fecha de publicación en Instagram. Tipos válidos: `feed`, `reel`, `historia`.
 - Dos piezas el mismo día: agregar `_2` al final (`2026-10-03_feed_2.jpg`).
-- En el Sheet, una fila por pieza, con la misma fecha y tipo que el nombre del archivo.
+- Formatos: `jpg` o `png` para imágenes, `mp4` para video, de menos de 50 MB.
+- En el Sheet, una fila por pieza. `marca` es `American Cola` o `Planet Fruit`, y `archivo` es el nombre exacto del archivo.
+- En la carpeta van solo las piezas finales.
 
 Después se le pide a Claude en el proyecto Monarch: **"armá octubre"**. Claude lee Drive, actualiza `posteos.js` y la carpeta `media/`, y la página se renueva en el mismo link en uno o dos minutos.
 

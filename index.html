@@ -93,6 +93,8 @@ header.top {
   border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted);
 }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.strip { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 2px; background: var(--line); }
+.strip .media { flex: 0 0 88%; scroll-snap-align: start; }
 .media { display: block; width: 100%; max-width: 100%; height: auto; background: var(--line); }
 .media.vert { aspect-ratio: 9 / 16; object-fit: cover; }
 .caption {
@@ -134,7 +136,7 @@ header.top {
     </div>
   </header>
 
-  <p class="note" id="note">Tocá <strong>Compartir</strong> y elegí WhatsApp: se manda la pieza con su texto. El texto además queda copiado, por si WhatsApp no lo incluye (pasa en iPhone): pegalo antes de enviar.</p>
+  <p class="note" id="note">Tocá <strong>Compartir</strong> y elegí WhatsApp: se manda la pieza con su texto (en los carruseles, todas las imágenes). El texto además queda copiado, por si WhatsApp no lo incluye (pasa en iPhone): pegalo antes de enviar.</p>
 
   <main class="feed" id="feed" role="tabpanel"></main>
 </div>
@@ -144,25 +146,37 @@ header.top {
 <script src="posteos.js"></script>
 <script>
 const MONTH = window.MONTH || { title: "", tag: "" };
-const POSTS = window.POSTS || [];
-const TYPE_LABEL = { feed: "Feed", reel: "Reel", historia: "Historia" };
+const POSTS = (window.POSTS || []).map(p => Object.assign({}, p, {
+  files: p.files || (p.file ? [p.file] : []),
+  caption: p.caption || ""
+}));
+const TYPE_LABEL = { fija: "Fija", carrusel: "Carrusel", historia: "Historia", reel: "Reel", feed: "Fija" };
 const BRAND_SLUG = { ac: "american-cola", pf: "planet-fruit" };
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const MIME = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", mp4: "video/mp4", webm: "video/webm" };
+const isVideoPath = s => /\.(mp4|webm)$/i.test(s);
 
 /* Los archivos se precargan para que el toque en Compartir abra el menú del celular al instante. */
 const fileCache = new Map();
-function getFile(p) {
-  if (!fileCache.has(p.file)) {
-    const ext = p.file.split(".").pop().toLowerCase();
-    const name = baseName(p) + "." + ext;
-    fileCache.set(p.file, fetch(p.file)
+function getOne(path, name) {
+  if (!fileCache.has(path)) {
+    const ext = path.split(".").pop().toLowerCase();
+    fileCache.set(path, fetch(path)
       .then(r => { if (!r.ok) throw new Error("missing"); return r.blob(); })
-      .then(b => { const f = new File([b], name, { type: MIME[ext] || b.type }); fileCache.set(p.file, f); return f; })
-      .catch(() => { fileCache.delete(p.file); return null; }));
+      .then(b => { const f = new File([b], name + "." + ext, { type: MIME[ext] || b.type }); fileCache.set(path, f); return f; })
+      .catch(() => { fileCache.delete(path); return null; }));
   }
-  return fileCache.get(p.file);
+  return fileCache.get(path);
+}
+function getFiles(p) {
+  const multi = p.files.length > 1;
+  return Promise.all(p.files.map((path, i) => getOne(path, baseName(p) + (multi ? "-" + String(i + 1).padStart(2, "0") : ""))))
+    .then(list => list.every(Boolean) ? list : null);
+}
+function cachedFiles(p) {
+  const list = p.files.map(path => fileCache.get(path));
+  return list.every(f => f instanceof File) ? list : null;
 }
 
 let brand = "ac";
@@ -188,6 +202,7 @@ function selectText(el) {
   const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
 }
 function copyCaption(text, el) {
+  if (!text) return Promise.resolve(true);
   try { return navigator.clipboard.writeText(text).then(() => true, () => { selectText(el); return false; }); }
   catch (e) { selectText(el); return Promise.resolve(false); }
 }
@@ -197,29 +212,42 @@ function saveFile(file) {
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-function canShareFile(f) {
-  try { return !!(f && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; }
+function saveAll(files) { files.forEach((f, i) => setTimeout(() => saveFile(f), i * 400)); }
+function canShareFiles(files) {
+  try { return !!(files && navigator.canShare && navigator.canShare({ files })); } catch (e) { return false; }
 }
 
 async function share(p, cap) {
   const copied = copyCaption(p.caption, cap);
-  let f = fileCache.get(p.file);
-  if (!(f instanceof File)) f = await getFile(p);
-  if (canShareFile(f)) {
+  const files = cachedFiles(p) || await getFiles(p);
+  if (canShareFiles(files)) {
     try {
-      await navigator.share({ files: [f], text: p.caption });
+      const data = { files };
+      if (p.caption) data.text = p.caption;
+      await navigator.share(data);
       return;
     } catch (e) {
       if (e && e.name === "AbortError") return;
     }
   }
-  if (f) {
-    saveFile(f);
+  if (files) {
+    saveAll(files);
     const ok = await copied;
-    showToast(ok ? "Pieza descargada y texto copiado. Abrí WhatsApp y adjuntala." : "Pieza descargada. Copiá el texto seleccionado.");
+    const what = files.length > 1 ? "Piezas descargadas" : "Pieza descargada";
+    showToast(!p.caption ? what + ". Abrí WhatsApp y adjuntala." : ok ? what + " y texto copiado. Abrí WhatsApp y adjuntala." : what + ". Copiá el texto seleccionado.");
   } else {
     showToast("No se pudo cargar la pieza. Revisá la conexión y probá de nuevo.");
   }
+}
+
+function makeMedia(path, p, i) {
+  const vid = isVideoPath(path);
+  const m = document.createElement(vid ? "video" : "img");
+  if (vid) { m.controls = true; m.playsInline = true; m.preload = "metadata"; }
+  else { m.loading = "lazy"; m.alt = (p.caption.split("\n")[0] || TYPE_LABEL[p.type] || "Pieza") + (p.files.length > 1 ? " (" + (i + 1) + ")" : ""); }
+  m.src = path;
+  m.className = "media" + (p.type === "historia" || p.type === "reel" ? " vert" : "");
+  return m;
 }
 
 function render() {
@@ -239,39 +267,48 @@ function render() {
     feed.append(e); return;
   }
   list.forEach(p => {
-    getFile(p);
+    getFiles(p);
     const art = document.createElement("article"); art.className = "post";
     const f = fmtDate(p.date);
     const when = document.createElement("div"); when.className = "when";
     const day = document.createElement("span"); day.className = "day"; day.textContent = f.day;
     const mon = document.createElement("span"); mon.textContent = f.month;
-    const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = TYPE_LABEL[p.type] || p.type;
+    const chip = document.createElement("span"); chip.className = "chip";
+    chip.textContent = (TYPE_LABEL[p.type] || p.type) + (p.files.length > 1 ? " · " + p.files.length : "");
     when.append(day, mon, chip);
 
     const card = document.createElement("div"); card.className = "card";
-    const isVideo = /\.(mp4|webm)$/i.test(p.file);
-    const media = document.createElement(isVideo ? "video" : "img");
-    if (isVideo) { media.controls = true; media.playsInline = true; media.preload = "metadata"; }
-    else { media.loading = "lazy"; media.alt = p.caption.split("\n")[0]; }
-    media.src = p.file; media.className = "media" + (p.type === "feed" ? "" : " vert");
+    let mediaBox;
+    if (p.files.length > 1) {
+      mediaBox = document.createElement("div"); mediaBox.className = "strip";
+      mediaBox.setAttribute("aria-label", "Deslizá para ver las " + p.files.length + " imágenes");
+      p.files.forEach((path, i) => mediaBox.append(makeMedia(path, p, i)));
+    } else {
+      mediaBox = makeMedia(p.files[0], p, 0);
+    }
 
     const cap = document.createElement("p"); cap.className = "caption"; cap.textContent = p.caption;
+    cap.hidden = !p.caption;
     const actions = document.createElement("div"); actions.className = "actions";
     const main = document.createElement("button"); main.className = "btn primary"; main.textContent = "Compartir";
-    const dl = document.createElement("button"); dl.className = "btn"; dl.textContent = isVideo ? "Descargar video" : "Descargar foto";
+    const multi = p.files.length > 1;
+    const vid = isVideoPath(p.files[0] || "");
+    const dl = document.createElement("button"); dl.className = "btn";
+    dl.textContent = multi ? "Descargar todas" : vid ? "Descargar video" : "Descargar foto";
     const copy = document.createElement("button"); copy.className = "btn"; copy.textContent = "Copiar texto";
+    copy.hidden = !p.caption;
 
     main.addEventListener("click", () => share(p, cap));
     dl.addEventListener("click", async () => {
-      const file = await getFile(p);
-      if (file) { saveFile(file); showToast("Descargando."); } else showToast("No se pudo cargar la pieza.");
+      const files = await getFiles(p);
+      if (files) { saveAll(files); showToast("Descargando."); } else showToast("No se pudo cargar la pieza.");
     });
     copy.addEventListener("click", async () => {
       const ok = await copyCaption(p.caption, cap);
       showToast(ok ? "Texto copiado." : "Texto seleccionado: copialo desde el menú del celular.");
     });
     actions.append(main, dl, copy);
-    card.append(media, cap, actions);
+    card.append(mediaBox, cap, actions);
     art.append(when, card);
     feed.append(art);
   });

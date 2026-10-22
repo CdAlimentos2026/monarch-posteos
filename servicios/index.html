@@ -190,13 +190,13 @@ body.tracking #cam{display:block}
 
 <div id="cam">
   <div class="wrap"><video id="video" playsinline muted></video><canvas id="mesh"></canvas></div>
-  <div class="bar"><span id="camState">Iniciando</span><b id="lean">—</b></div>
+  <div class="bar"><span id="camState">Iniciando</span><b id="hand">—</b><b id="lean">—</b></div>
 </div>
 
 <div id="help">
   <span><b>Girá la cabeza</b> para apuntar</span>
   <span><b>Sostené la mirada</b> o <b>acercate</b> para entrar</span>
-  <span><b>Echate atrás</b> para salir</span>
+  <span><b>Cerrá el puño</b> o <b>echate atrás</b> para salir</span>
 </div>
 
 <script>
@@ -231,9 +231,9 @@ addEventListener('resize',layout);
 document.fonts.ready.then(layout);layout();
 
 /* ---------- seguimiento facial ---------- */
-const statusEl=document.getElementById('status'), camState=document.getElementById('camState'), leanEl=document.getElementById('lean');
+const handEl=document.getElementById('hand'), statusEl=document.getElementById('status'), camState=document.getElementById('camState'), leanEl=document.getElementById('lean');
 const cursor=document.getElementById('cursor'), video=document.getElementById('video'), mesh=document.getElementById('mesh'), mctx=mesh.getContext('2d');
-let landmarker=null, calib=null, calibBuf=[], smooth={x:0,y:0,w:1}, hover=-1, dwellStart=0, leanT=0, backT=0;
+let landmarker=null, gesturer=null, fistT=0, noEnterUntil=0, calib=null, calibBuf=[], smooth={x:0,y:0,w:1}, hover=-1, dwellStart=0, leanT=0, backT=0;
 const DWELL=1600;
 
 async function startTracking(){
@@ -241,9 +241,10 @@ async function startTracking(){
   try{
     const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480},audio:false});
     video.srcObject=stream;await video.play();
-    const {FaceLandmarker,FilesetResolver}=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+    const {FaceLandmarker,GestureRecognizer,FilesetResolver}=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
     const fs=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
     landmarker=await FaceLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:1});
+    try{gesturer=await GestureRecognizer.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',delegate:'GPU'},runningMode:'VIDEO',numHands:1})}catch(e){console.warn('Sin reconocimiento de mano',e)}
     document.body.classList.add('tracking');
     document.getElementById('startCam').hidden=true;document.getElementById('recal').hidden=false;document.getElementById('stopCam').hidden=false;
     recalibrate();if(!looping){looping=true;loop()}
@@ -258,6 +259,7 @@ let looping=false;
 function stopTracking(){
   if(video.srcObject){video.srcObject.getTracks().forEach(t=>t.stop());video.srcObject=null}
   if(landmarker){landmarker.close();landmarker=null}
+  if(gesturer){gesturer.close();gesturer=null}fistT=0;
   document.body.classList.remove('tracking');
   pillars.forEach(q=>{q.classList.remove('hot');q.querySelector('.prg').style.strokeDashoffset=75.4});hover=-1;
   pan={x:0,y:0};layout();
@@ -287,6 +289,7 @@ function loop(){
   const t=performance.now(); if(t===lastT)return; lastT=t;
   const r=landmarker.detectForVideo(video,t);
   mesh.width=video.videoWidth;mesh.height=video.videoHeight;mctx.clearRect(0,0,mesh.width,mesh.height);
+  hand(t);
   if(!r.faceLandmarks||!r.faceLandmarks.length){camState.textContent='Sin rostro';return}
   const L=r.faceLandmarks[0];
   mctx.fillStyle='rgba(0,240,255,.85)';
@@ -305,6 +308,23 @@ function loop(){
   act(t);
 }
 
+/* mano: puño cerrado = salir del zoom */
+function hand(t){
+  if(!gesturer)return;
+  const g=gesturer.recognizeForVideo(video,t);
+  const H=g.landmarks&&g.landmarks[0];
+  if(!H){fistT=0;handEl.textContent='—';return}
+  const top=g.gestures[0]&&g.gestures[0][0], fist=top&&top.categoryName==='Closed_Fist'&&top.score>.6;
+  mctx.fillStyle=fist?'#E63946':'#FFD60A';
+  for(const q of H)mctx.fillRect(q.x*mesh.width-2.5,q.y*mesh.height-2.5,5,5);
+  handEl.textContent=fist?'Puño':'Mano';
+  if(fist){if(!fistT)fistT=t;
+    if(active>=0&&t-fistT>250){leave();fistT=0;noEnterUntil=t+1800;
+      pillars.forEach(q=>{q.classList.remove('hot');q.querySelector('.prg').style.strokeDashoffset=75.4});hover=-1}
+    noEnterUntil=Math.max(noEnterUntil,t+600);
+  }else fistT=0;
+}
+
 function act(t){
   const cx=innerWidth/2+smooth.x*innerWidth*.46, cy=innerHeight/2+smooth.y*innerHeight*.44;
   cursor.style.left=cx+'px';cursor.style.top=cy+'px';
@@ -313,7 +333,8 @@ function act(t){
     layout();
     const el=document.elementFromPoint(cx,cy), p=el&&el.closest('.pillar'), i=p?+p.dataset.i:-1;
     if(i!==hover){pillars.forEach(q=>{q.classList.remove('hot');q.querySelector('.prg').style.strokeDashoffset=75.4});hover=i;dwellStart=t;if(p)p.classList.add('hot')}
-    if(hover>=0){
+    if(t<noEnterUntil){dwellStart=t;leanT=0}
+    if(hover>=0&&t>=noEnterUntil){
       const k=Math.min(1,(t-dwellStart)/DWELL);pillars[hover].querySelector('.prg').style.strokeDashoffset=75.4*(1-k);
       if(smooth.w>1.12){if(!leanT)leanT=t}else leanT=0;
       if(k>=1||(leanT&&t-leanT>350)){const h=hover;hover=-1;leanT=0;pillars[h].classList.remove('hot');pillars[h].querySelector('.prg').style.strokeDashoffset=75.4;enter(h);backT=t+900}

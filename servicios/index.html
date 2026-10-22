@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Monarch Servicio Integral</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Instrument+Sans:wght@400;500;600&family=Chakra+Petch:wght@500;600&display=swap">
+<style>
+/* Layout: un "tablero" 2x2 dentro de un mundo que la cámara (o el mouse) recorre y amplía; HUD técnico en los bordes */
+:root{
+  --bg:#070b16; --bg2:#0d1428; --line:#22305a; --fg:#e8ecf7; --muted:#8e9ac0;
+  --ice:#7fd3ff; --amber:#ffb547; --glass:rgba(16,24,48,.72);
+  --f-display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-hud:"Chakra Petch","Courier New",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+canvas#fizz{position:fixed;inset:0;z-index:0;pointer-events:none}
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:56px 56px;opacity:.18;mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%)}
+
+header{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  padding:calc(18px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px));pointer-events:none}
+.brand .eyebrow{font-family:var(--f-hud);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ice)}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:clamp(20px,3vw,34px);margin:6px 0 0;line-height:1.05;text-wrap:balance}
+.brand p{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:46ch}
+.hud-status{font-family:var(--f-hud);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:right;pointer-events:auto}
+.hud-status b{color:var(--amber);font-weight:600}
+.btn{font-family:var(--f-hud);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--bg);background:var(--ice);
+  border:0;border-radius:2px;padding:10px 14px;cursor:pointer;margin-top:8px}
+.btn.ghost{background:transparent;color:var(--ice);outline:1px solid var(--ice)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+
+#viewport{position:fixed;inset:0;z-index:1;overflow:hidden}
+#world{position:absolute;left:50%;top:50%;width:min(1180px,94vw);transform-origin:0 0;
+  transition:transform 900ms cubic-bezier(.2,.75,.15,1)}
+.board{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2.2vw,28px)}
+.pillar{position:relative;background:var(--glass);border:1px solid var(--line);padding:clamp(16px,2.2vw,28px);cursor:pointer;
+  min-height:clamp(200px,30vh,300px);display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px);
+  transition:border-color .3s, box-shadow .3s, opacity .5s}
+.pillar::before,.pillar::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--ice);opacity:.55}
+.pillar::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.pillar::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.pillar.hot{border-color:var(--ice);box-shadow:0 0 0 1px var(--ice),0 0 40px rgba(127,211,255,.18)}
+.pillar .code{font-family:var(--f-hud);font-size:12px;letter-spacing:.2em;color:var(--ice);text-transform:uppercase;display:flex;justify-content:space-between;padding-right:34px}
+.pillar h2{font-family:var(--f-display);font-weight:700;font-size:clamp(18px,2.2vw,28px);margin:0;line-height:1.1;text-wrap:balance}
+.pillar .lead{margin:0;color:var(--muted);font-size:15px;line-height:1.45;max-width:44ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.chips span{font-family:var(--f-hud);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);padding:4px 8px;color:var(--fg)}
+.detail{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin:6px 0 0;padding:0;list-style:none;max-height:0;overflow:hidden;opacity:0;
+  transition:opacity .5s .3s, max-height .6s}
+.detail li{border-top:1px solid var(--line);padding-top:8px;font-size:13px;line-height:1.4;min-width:0}
+.detail li strong{display:block;font-weight:600;color:var(--fg);font-size:13.5px}
+.detail li span{color:var(--muted)}
+body.zoomed .pillar{opacity:.18}
+body.zoomed .pillar.active{opacity:1;border-color:var(--ice)}
+body.zoomed .pillar.active .detail{max-height:600px;opacity:1}
+body.zoomed .pillar.active .chips{display:none}
+.dwell{position:absolute;top:14px;right:14px;width:28px;height:28px}
+.dwell circle{fill:none;stroke-width:3}
+.dwell .trk{stroke:var(--line)} .dwell .prg{stroke:var(--amber);stroke-dasharray:75.4;stroke-dashoffset:75.4;transform:rotate(-90deg);transform-origin:50% 50%}
+
+#back{position:fixed;z-index:6;left:50%;transform:translateX(-50%);top:calc(14px + env(safe-area-inset-top,0px));display:none;
+  font-family:var(--f-hud);letter-spacing:.14em;text-transform:uppercase;font-size:13px;background:var(--glass);color:var(--amber);
+  border:1px solid var(--amber);padding:10px 16px;cursor:pointer}
+body.zoomed #back{display:block}
+body.zoomed header{opacity:0;transition:opacity .4s}
+
+#cursor{position:fixed;z-index:7;width:46px;height:46px;margin:-23px 0 0 -23px;pointer-events:none;display:none}
+body.tracking #cursor{display:block}
+#cursor i{position:absolute;inset:0;border:1.5px solid var(--amber);border-radius:50%}
+#cursor i::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;background:var(--amber);border-radius:50%}
+#cursor b{position:absolute;left:50%;top:-6px;bottom:-6px;width:1px;background:var(--amber);opacity:.4}
+#cursor em{position:absolute;top:50%;left:-6px;right:-6px;height:1px;background:var(--amber);opacity:.4}
+
+#cam{position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  width:200px;border:1px solid var(--line);background:var(--bg2);display:none}
+body.tracking #cam{display:block}
+#cam .wrap{position:relative;aspect-ratio:4/3}
+#cam video,#cam canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);object-fit:cover}
+#cam video{opacity:.35;filter:grayscale(1) contrast(1.2)}
+#cam .bar{font-family:var(--f-hud);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:6px 8px;display:flex;justify-content:space-between;gap:6px}
+#cam .bar b{color:var(--ice);font-weight:500}
+
+#help{position:fixed;z-index:5;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  font-family:var(--f-hud);font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;max-width:calc(100vw - 260px)}
+#help span b{color:var(--fg);font-weight:600}
+
+@media (max-width:760px){
+  body{overflow:auto}
+  #world{width:calc(100vw - 32px)}
+  .board{grid-template-columns:1fr}
+  .detail{grid-template-columns:1fr}
+  #help{display:none}
+  #cam{width:130px}
+  .brand p{display:none}
+}
+@media (prefers-reduced-motion:reduce){#world{transition:none} canvas#fizz{display:none}}
+</style>
+</head>
+<body>
+<canvas id="fizz"></canvas>
+<div class="grid-bg"></div>
+
+<header>
+  <div class="brand">
+    <div class="eyebrow">Creadores de Alimentos × Monarch Beverages</div>
+    <h1>Servicio Integral Monarch</h1>
+    <p>Un solo equipo para todo el portfolio: cuatro núcleos que trabajan conectados.</p>
+  </div>
+  <div class="hud-status">
+    <div id="status">Modo mouse · <b>tocá un núcleo</b></div>
+    <button class="btn" id="startCam">Activar seguimiento facial</button>
+    <button class="btn ghost" id="recal" hidden>Recalibrar</button>
+  </div>
+</header>
+
+<button id="back">← Volver al tablero</button>
+
+<div id="viewport"><div id="world"><div class="board">
+
+  <article class="pillar" data-i="0" tabindex="0">
+    <svg class="dwell" viewBox="0 0 28 28"><circle class="trk" cx="14" cy="14" r="12"/><circle class="prg" cx="14" cy="14" r="12"/></svg>
+    <div class="code"><span>Núcleo M</span><span>Performance</span></div>
+    <h2>Marketing</h2>
+    <p class="lead">Pauta digital y creatividad pensadas para vender, gestionadas para todas las marcas desde un mismo tablero.</p>
+    <div class="chips"><span>Paid media</span><span>Creatividad</span><span>Campañas</span><span>Web</span><span>BTL</span></div>
+    <ul class="detail">
+      <li><strong>Paid media</strong><span>Estructura, gestión y optimización de campañas en Meta para todo el portfolio.</span></li>
+      <li><strong>Creatividad de anuncios</strong><span>Diseño de las piezas que salen a pauta, alineadas al manual de cada marca.</span></li>
+      <li><strong>Campañas</strong><span>Planificación de lanzamientos y temporadas por marca, canal y zona.</span></li>
+      <li><strong>Web / e-commerce</strong><span>Sitio institucional o tienda online según lo que necesite cada marca.</span></li>
+      <li><strong>BTL</strong><span>Acciones en punto de venta y en la calle conectadas con la pauta digital.</span></li>
+    </ul>
+  </article>
+
+  <article class="pillar" data-i="1" tabindex="0">
+    <svg class="dwell" viewBox="0 0 28 28"><circle class="trk" cx="14" cy="14" r="12"/><circle class="prg" cx="14" cy="14" r="12"/></svg>
+    <div class="code"><span>Núcleo I</span><span>Inteligencia</span></div>
+    <h2>Investigación, manual y plataforma</h2>
+    <p class="lead">Lo que pasa en el mercado, traducido a qué decir y a qué hacer, con una bajada operativa que el equipo puede seguir paso a paso.</p>
+    <div class="chips"><span>Research bimestral</span><span>Manual</span><span>Bajada operativa</span></div>
+    <ul class="detail">
+      <li><strong>Investigación de mercado</strong><span>Una investigación cada 2 meses, a distancia o presencial en el país que se defina.</span></li>
+      <li><strong>Manual de comunicación</strong><span>Qué decir, a quién y con qué palabras, por marca y por canal.</span></li>
+      <li><strong>Plataforma de bajada operativa</strong><span>Cada hallazgo convertido en acciones concretas, ordenadas por rol.</span></li>
+      <li><strong>Actualización continua</strong><span>El manual y la plataforma se ajustan con cada nueva investigación.</span></li>
+    </ul>
+  </article>
+
+  <article class="pillar" data-i="2" tabindex="0">
+    <svg class="dwell" viewBox="0 0 28 28"><circle class="trk" cx="14" cy="14" r="12"/><circle class="prg" cx="14" cy="14" r="12"/></svg>
+    <div class="code"><span>Núcleo V</span><span>Fuerza comercial</span></div>
+    <h2>Ventas</h2>
+    <p class="lead">Un equipo comercial que sabe qué decir en cada punto de venta, y números que muestran qué está funcionando.</p>
+    <div class="chips"><span>Capacitación</span><span>Plataforma</span><span>Métricas</span></div>
+    <ul class="detail">
+      <li><strong>Encargado comercial</strong><span>Capacitación del nuevo encargado que incorpora Monarch.</span></li>
+      <li><strong>Vendedores y encargados de zona</strong><span>Formación práctica sobre portfolio, argumentos y manejo del punto de venta.</span></li>
+      <li><strong>Plataforma comercial</strong><span>Actualización continua del material de venta y los procesos.</span></li>
+      <li><strong>Métricas y reportes</strong><span>Seguimiento, medición y reportes de mejora con acciones concretas.</span></li>
+    </ul>
+  </article>
+
+  <article class="pillar" data-i="3" tabindex="0">
+    <svg class="dwell" viewBox="0 0 28 28"><circle class="trk" cx="14" cy="14" r="12"/><circle class="prg" cx="14" cy="14" r="12"/></svg>
+    <div class="code"><span>Núcleo D</span><span>Dirección</span></div>
+    <h2>Dirección estratégica de marca</h2>
+    <p class="lead">El hilo que conecta los otros tres núcleos: cada marca cuenta su historia, pero todas responden a una misma estrategia.</p>
+    <div class="chips"><span>Reunión semanal</span><span>Coherencia</span><span>Prioridades</span></div>
+    <ul class="detail">
+      <li><strong>Reunión semanal</strong><span>Encuentro fijo con Valeria para decidir, revisar y ajustar.</span></li>
+      <li><strong>Coherencia entre marcas</strong><span>Un mismo criterio en marcas, canales y países.</span></li>
+      <li><strong>Prioridades del mes</strong><span>Dónde poner los recursos y qué queda para después.</span></li>
+      <li><strong>Integración</strong><span>Marketing, investigación y ventas trabajando sobre el mismo plan.</span></li>
+    </ul>
+  </article>
+
+</div></div></div>
+
+<div id="cursor"><b></b><em></em><i></i></div>
+
+<div id="cam">
+  <div class="wrap"><video id="video" playsinline muted></video><canvas id="mesh"></canvas></div>
+  <div class="bar"><span id="camState">Iniciando</span><b id="lean">—</b></div>
+</div>
+
+<div id="help">
+  <span><b>Girá la cabeza</b> para apuntar</span>
+  <span><b>Sostené la mirada</b> o <b>acercate</b> para entrar</span>
+  <span><b>Echate atrás</b> para salir</span>
+</div>
+
+<script>
+/* ---------- burbujas de fondo ---------- */
+(()=>{const c=document.getElementById('fizz'),x=c.getContext('2d');let W,H,b=[];
+function rs(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio}rs();addEventListener('resize',rs);
+for(let i=0;i<70;i++)b.push({x:Math.random(),y:Math.random(),r:Math.random()*2.2+.6,v:Math.random()*.0012+.0004});
+(function f(){x.clearRect(0,0,W,H);for(const p of b){p.y-=p.v;if(p.y<-.02){p.y=1.02;p.x=Math.random()}
+x.beginPath();x.arc(p.x*W+Math.sin(p.y*20+p.r)*6,p.y*H,p.r*devicePixelRatio,0,7);x.strokeStyle='rgba(127,211,255,.28)';x.stroke()}requestAnimationFrame(f)})()})();
+
+/* ---------- navegación (zoom del mundo) ---------- */
+const world=document.getElementById('world'), pillars=[...document.querySelectorAll('.pillar')];
+let active=-1, pan={x:0,y:0};
+const mobile=()=>innerWidth<=760;
+function layout(){
+  const w=world.offsetWidth,h=world.offsetHeight;
+  if(active<0){
+    if(mobile()){world.style.transform=`translate(${-w/2}px,${-innerHeight/2+150}px)`;return}
+    world.style.transform=`translate(${-w/2+pan.x*18}px,${-h/2+40+pan.y*12}px)`;return}
+  const p=pillars[active], pw=p.offsetWidth, ph=p.offsetHeight;
+  const s=Math.min(innerWidth*.86/pw, innerHeight*.78/Math.max(ph,1), mobile()?1.15:2.1);
+  const cx=p.offsetLeft+pw/2, cy=p.offsetTop+ph/2;
+  world.style.transform=`translate(${-cx*s+pan.x*-30}px,${-cy*s+20+pan.y*-20}px) scale(${s})`;
+}
+function enter(i){if(active===i)return;active=i;pillars.forEach((p,k)=>p.classList.toggle('active',k===i));document.body.classList.add('zoomed');
+  requestAnimationFrame(()=>requestAnimationFrame(layout));setTimeout(layout,650)}
+function leave(){active=-1;pillars.forEach(p=>p.classList.remove('active'));document.body.classList.remove('zoomed');layout()}
+pillars.forEach((p,i)=>{p.addEventListener('click',()=>active<0?enter(i):null);p.addEventListener('keydown',e=>{if(e.key==='Enter')enter(i)})});
+document.getElementById('back').onclick=leave;
+addEventListener('keydown',e=>{if(e.key==='Escape')leave();if('1234'.includes(e.key))enter(+e.key-1)});
+addEventListener('resize',layout);
+document.fonts.ready.then(layout);layout();
+
+/* ---------- seguimiento facial ---------- */
+const statusEl=document.getElementById('status'), camState=document.getElementById('camState'), leanEl=document.getElementById('lean');
+const cursor=document.getElementById('cursor'), video=document.getElementById('video'), mesh=document.getElementById('mesh'), mctx=mesh.getContext('2d');
+let landmarker=null, calib=null, calibBuf=[], smooth={x:0,y:0,w:1}, hover=-1, dwellStart=0, leanT=0, backT=0;
+const DWELL=1600;
+
+async function startTracking(){
+  statusEl.innerHTML='Cargando modelo de <b>visión</b>…';
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480},audio:false});
+    video.srcObject=stream;await video.play();
+    const {FaceLandmarker,FilesetResolver}=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+    const fs=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    landmarker=await FaceLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:1});
+    document.body.classList.add('tracking');
+    document.getElementById('startCam').hidden=true;document.getElementById('recal').hidden=false;
+    recalibrate();loop();
+  }catch(e){
+    statusEl.innerHTML='No se pudo usar la cámara · <b>seguí con el mouse</b>';console.error(e);
+  }
+}
+function recalibrate(){calib=null;calibBuf=[];statusEl.innerHTML='Calibrando · <b>mirá al centro de la pantalla</b>';camState.textContent='Calibrando'}
+document.getElementById('startCam').onclick=startTracking;
+document.getElementById('recal').onclick=recalibrate;
+
+function measure(L){
+  const le=L[33], re=L[263], nose=L[1], li=L[133], ri=L[362];
+  const w=Math.hypot(re.x-le.x,re.y-le.y);
+  const mid={x:(le.x+re.x)/2,y:(le.y+re.y)/2};
+  let yaw=(nose.x-mid.x)/w, pitch=(nose.y-mid.y)/w;
+  // mirada: posición del iris dentro de cada ojo
+  let gaze=0;
+  if(L[468]&&L[473]){
+    const gl=(L[468].x-(le.x+li.x)/2)/Math.abs(li.x-le.x), gr=(L[473].x-(ri.x+re.x)/2)/Math.abs(re.x-ri.x);
+    gaze=(gl+gr)/2;
+  }
+  return {yaw:yaw+gaze*.35,pitch,w};
+}
+
+let lastT=-1;
+function loop(){
+  requestAnimationFrame(loop);
+  if(!landmarker||video.readyState<2)return;
+  const t=performance.now(); if(t===lastT)return; lastT=t;
+  const r=landmarker.detectForVideo(video,t);
+  mesh.width=video.videoWidth;mesh.height=video.videoHeight;mctx.clearRect(0,0,mesh.width,mesh.height);
+  if(!r.faceLandmarks||!r.faceLandmarks.length){camState.textContent='Sin rostro';return}
+  const L=r.faceLandmarks[0];
+  mctx.fillStyle='rgba(127,211,255,.85)';
+  for(let i=0;i<L.length;i+=3){mctx.fillRect(L[i].x*mesh.width,L[i].y*mesh.height,1.6,1.6)}
+  mctx.fillStyle='#ffb547';for(const k of [1,468,473]){if(L[k])mctx.fillRect(L[k].x*mesh.width-2,L[k].y*mesh.height-2,4,4)}
+  const m=measure(L);
+  if(!calib){calibBuf.push(m);camState.textContent=`Calibrando ${Math.round(calibBuf.length/40*100)}%`;
+    if(calibBuf.length>=40){const a=k=>calibBuf.reduce((s,v)=>s+v[k],0)/calibBuf.length;calib={yaw:a('yaw'),pitch:a('pitch'),w:a('w')};
+      statusEl.innerHTML='Seguimiento <b>activo</b>';camState.textContent='Activo'}return}
+  // espejo: girar a tu izquierda mueve el cursor a la izquierda
+  const tx=Math.max(-1,Math.min(1,-(m.yaw-calib.yaw)/0.22));
+  const ty=Math.max(-1,Math.min(1,(m.pitch-calib.pitch)/0.14));
+  const tw=m.w/calib.w;
+  smooth.x+=(tx-smooth.x)*.18;smooth.y+=(ty-smooth.y)*.18;smooth.w+=(tw-smooth.w)*.12;
+  leanEl.textContent=smooth.w>1.12?'Cerca':smooth.w<.9?'Lejos':'Centro';
+  act(t);
+}
+
+function act(t){
+  const cx=innerWidth/2+smooth.x*innerWidth*.46, cy=innerHeight/2+smooth.y*innerHeight*.44;
+  cursor.style.left=cx+'px';cursor.style.top=cy+'px';
+  pan={x:smooth.x,y:smooth.y};
+  if(active<0){
+    layout();
+    const el=document.elementFromPoint(cx,cy), p=el&&el.closest('.pillar'), i=p?+p.dataset.i:-1;
+    if(i!==hover){pillars.forEach(q=>{q.classList.remove('hot');q.querySelector('.prg').style.strokeDashoffset=75.4});hover=i;dwellStart=t;if(p)p.classList.add('hot')}
+    if(hover>=0){
+      const k=Math.min(1,(t-dwellStart)/DWELL);pillars[hover].querySelector('.prg').style.strokeDashoffset=75.4*(1-k);
+      if(smooth.w>1.12){if(!leanT)leanT=t}else leanT=0;
+      if(k>=1||(leanT&&t-leanT>350)){const h=hover;hover=-1;leanT=0;pillars[h].classList.remove('hot');pillars[h].querySelector('.prg').style.strokeDashoffset=75.4;enter(h);backT=t+900}
+    }
+  }else{
+    layout();
+    if(t<backT)return;
+    if(smooth.w<.9){if(!leanT)leanT=t}else leanT=0;
+    if((leanT&&t-leanT>400)){leanT=0;leave();dwellStart=t}
+  }
+}
+
+/* modo mouse: mismo paneo suave */
+addEventListener('mousemove',e=>{if(document.body.classList.contains('tracking'))return;
+  pan={x:(e.clientX/innerWidth-.5)*2,y:(e.clientY/innerHeight-.5)*2};if(!mobile())layout()});
+</script>
+</body>
+</html>

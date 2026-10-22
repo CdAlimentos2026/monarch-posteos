@@ -118,6 +118,7 @@ body.tracking #cam{display:block}
     <div id="status">Modo mouse · <b>tocá un núcleo</b></div>
     <button class="btn" id="startCam">Activar seguimiento facial</button>
     <button class="btn ghost" id="recal" hidden>Recalibrar</button>
+    <button class="btn ghost" id="stopCam" hidden>Desactivar cámara</button>
   </div>
 </header>
 
@@ -244,8 +245,8 @@ async function startTracking(){
     const fs=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
     landmarker=await FaceLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:1});
     document.body.classList.add('tracking');
-    document.getElementById('startCam').hidden=true;document.getElementById('recal').hidden=false;
-    recalibrate();loop();
+    document.getElementById('startCam').hidden=true;document.getElementById('recal').hidden=false;document.getElementById('stopCam').hidden=false;
+    recalibrate();if(!looping){looping=true;loop()}
   }catch(e){
     statusEl.innerHTML='No se pudo usar la cámara · <b>seguí con el mouse</b>';console.error(e);
   }
@@ -253,6 +254,17 @@ async function startTracking(){
 function recalibrate(){calib=null;calibBuf=[];statusEl.innerHTML='Calibrando · <b>mirá al centro de la pantalla</b>';camState.textContent='Calibrando'}
 document.getElementById('startCam').onclick=startTracking;
 document.getElementById('recal').onclick=recalibrate;
+let looping=false;
+function stopTracking(){
+  if(video.srcObject){video.srcObject.getTracks().forEach(t=>t.stop());video.srcObject=null}
+  if(landmarker){landmarker.close();landmarker=null}
+  document.body.classList.remove('tracking');
+  pillars.forEach(q=>{q.classList.remove('hot');q.querySelector('.prg').style.strokeDashoffset=75.4});hover=-1;
+  pan={x:0,y:0};layout();
+  document.getElementById('startCam').hidden=false;document.getElementById('recal').hidden=true;document.getElementById('stopCam').hidden=true;
+  statusEl.innerHTML='Modo mouse · <b>tocá un núcleo</b>';
+}
+document.getElementById('stopCam').onclick=stopTracking;
 
 function measure(L){
   const le=L[33], re=L[263], nose=L[1], li=L[133], ri=L[362];

@@ -58,6 +58,12 @@ header{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;justify-conten
 .detail li{border-top:1px solid var(--line);padding-top:8px;font-size:13px;line-height:1.4;min-width:0}
 .detail li strong{display:block;font-weight:600;color:var(--fg);font-size:13.5px}
 .detail li span{color:var(--muted)}
+.perk{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding:14px clamp(16px,2.2vw,28px);
+  border:1px dashed var(--amber);background:rgba(255,214,10,.06);transition:opacity .5s}
+.perk .code{font-family:var(--f-hud);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);display:flex;gap:14px}
+.perk p{margin:0;font-size:15px;line-height:1.45;color:var(--muted);flex:1;min-width:0}
+.perk strong{color:var(--fg);font-weight:600}
+body.zoomed .perk{opacity:0;pointer-events:none}
 body.zoomed .pillar{opacity:.18}
 body.zoomed .pillar.active{opacity:1;border-color:var(--ice)}
 body.zoomed .pillar.active .detail{max-height:600px;opacity:1}
@@ -131,12 +137,11 @@ body.tracking #cam{display:block}
     <div class="code"><span>Núcleo M</span><span>Performance</span></div>
     <h2>Marketing</h2>
     <p class="lead">Pauta digital y creatividad pensadas para vender, gestionadas para todas las marcas desde un mismo tablero.</p>
-    <div class="chips"><span>Paid media</span><span>Creatividad</span><span>Campañas</span><span>Web</span><span>BTL</span><span>Contenido</span></div>
+    <div class="chips"><span>Paid media</span><span>Creatividad</span><span>Campañas</span><span>BTL</span><span>Contenido</span></div>
     <ul class="detail">
       <li><strong>Paid media</strong><span>Estructura, gestión y optimización de campañas en Meta para todo el portfolio.</span></li>
       <li><strong>Creatividad de anuncios</strong><span>Diseño de las piezas que salen a pauta, alineadas al manual de cada marca.</span></li>
       <li><strong>Campañas</strong><span>Planificación de lanzamientos y temporadas por marca, canal y zona.</span></li>
-      <li><strong>Web / e-commerce</strong><span>Sitio institucional o tienda online según lo que necesite cada marca.</span></li>
       <li><strong>BTL</strong><span>Acciones en punto de venta y en la calle conectadas con la pauta digital.</span></li>
       <li><strong>Creatividad en contenido</strong><span>Ideas, formatos y ángulos nuevos todos los meses, para que la comunicación nunca se estanque y cada marca salga con energía.</span></li>
     </ul>
@@ -183,6 +188,11 @@ body.tracking #cam{display:block}
       <li><strong>Prioridades del mes</strong><span>Dónde poner los recursos y qué queda para después.</span></li>
     </ul>
   </article>
+
+  <aside class="perk">
+    <div class="code"><span>Beneficio pack completo</span><span>Web</span></div>
+    <p><strong>Web o e-commerce con condición preferencial</strong> para cada marca que lo necesite, con <strong>2 meses de mantenimiento bonificado</strong>. Sitios de hasta 7 páginas.</p>
+  </aside>
 
 </div></div></div>
 

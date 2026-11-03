@@ -94,6 +94,22 @@ body.tracking #cam{display:block}
 #cam .bar{font-family:var(--f-hud);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:6px 8px;display:flex;justify-content:space-between;gap:6px}
 #cam .bar b{color:var(--ice);font-weight:500}
 
+#speedo{position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px) + 186px);
+  width:200px;border:1px solid var(--line);background:var(--bg2);padding:8px 10px 10px;display:none;font-family:var(--f-hud)}
+body.tracking #speedo{display:block}
+#speedo .lb{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
+#speedo svg{display:block;width:100%;height:auto;margin-top:4px}
+#speedo .arc{fill:none;stroke:var(--line);stroke-width:8;stroke-linecap:round}
+#speedo .val{fill:none;stroke:var(--amber);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .12s linear}
+#speedo .needle{stroke:var(--red);stroke-width:2.5;stroke-linecap:round;transition:transform .12s linear;transform-origin:100px 100px}
+#speedo .num{font-size:30px;font-weight:700;fill:var(--fg);text-anchor:middle;font-variant-numeric:tabular-nums}
+#speedo .unit{font-size:11px;fill:var(--muted);text-anchor:middle;letter-spacing:.1em}
+#speedo .tick{font-size:9px;fill:var(--muted);text-anchor:middle}
+#speedo .foot{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--muted);letter-spacing:.06em;margin-top:2px}
+#speedo .foot b{color:var(--ice);font-weight:700;font-variant-numeric:tabular-nums}
+#speedo button{font-family:var(--f-hud);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid var(--line);color:var(--muted);padding:3px 6px;cursor:pointer}
+#speedo .cm{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.35}
+@media (max-width:760px){#speedo{width:130px;bottom:calc(16px + env(safe-area-inset-bottom,0px) + 130px)}#speedo .cm{display:none}}
 #help{position:fixed;z-index:5;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));
   font-family:var(--f-hud);font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;max-width:calc(100vw - 260px)}
 #help span b{color:var(--fg);font-weight:600}
@@ -203,6 +219,21 @@ body.tracking #cam{display:block}
   <div class="bar"><span id="camState">Iniciando</span><b id="hand">—</b><b id="lean">—</b></div>
 </div>
 
+<div id="speedo" aria-live="off">
+  <div class="lb"><span>Velocímetro de mano</span><span id="spState">—</span></div>
+  <svg viewBox="0 0 200 150">
+    <path class="arc" d="M20 100 A80 80 0 0 1 180 100"/>
+    <path class="val" id="spArc" d="M20 100 A80 80 0 0 1 180 100" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+    <line class="needle" id="spNeedle" x1="100" y1="100" x2="100" y2="30" style="transform:rotate(-90deg)"/>
+    <circle cx="100" cy="100" r="4" fill="var(--red)"/>
+    <text class="tick" x="20" y="116">0</text><text class="tick" x="100" y="14">10</text><text class="tick" x="180" y="116">20</text>
+    <text class="num" id="spNum" x="92" y="144">0,0</text>
+    <text class="unit" x="150" y="144">KM/H</text>
+  </svg>
+  <div class="foot"><span id="spCms">0 cm/s</span><span>Máx <b id="spMax">0,0</b></span><button id="spReset" type="button">Reset</button></div>
+  <div class="cm">Estimado: mide el movimiento de la mano frente a la cámara, tomando el ancho de la palma como escala.</div>
+</div>
+
 <div id="help">
   <span><b>Girá la cabeza</b> para apuntar</span>
   <span><b>Sostené la mirada</b> o <b>acercate</b> para entrar</span>
@@ -243,7 +274,7 @@ document.fonts.ready.then(layout);layout();
 /* ---------- seguimiento facial ---------- */
 const handEl=document.getElementById('hand'), statusEl=document.getElementById('status'), camState=document.getElementById('camState'), leanEl=document.getElementById('lean');
 const cursor=document.getElementById('cursor'), video=document.getElementById('video'), mesh=document.getElementById('mesh'), mctx=mesh.getContext('2d');
-let landmarker=null, gesturer=null, fistT=0, noEnterUntil=0, calib=null, calibBuf=[], smooth={x:0,y:0,w:1}, hover=-1, dwellStart=0, leanT=0, backT=0;
+let spPrev=null, spV=0, spMax=0, landmarker=null, gesturer=null, fistT=0, noEnterUntil=0, calib=null, calibBuf=[], smooth={x:0,y:0,w:1}, hover=-1, dwellStart=0, leanT=0, backT=0;
 const DWELL=1600;
 
 async function startTracking(){
@@ -269,7 +300,7 @@ let looping=false;
 function stopTracking(){
   if(video.srcObject){video.srcObject.getTracks().forEach(t=>t.stop());video.srcObject=null}
   if(landmarker){landmarker.close();landmarker=null}
-  if(gesturer){gesturer.close();gesturer=null}fistT=0;
+  if(gesturer){gesturer.close();gesturer=null}fistT=0;spPrev=null;spV=0;drawSpeed(0);
   document.body.classList.remove('tracking');
   pillars.forEach(q=>{q.classList.remove('hot');q.querySelector('.prg').style.strokeDashoffset=75.4});hover=-1;
   pan={x:0,y:0};layout();
@@ -319,11 +350,48 @@ function loop(){
 }
 
 /* mano: puño cerrado = salir del zoom */
+/* velocímetro: velocidad de la palma en el plano de la cámara.
+   Escala: ancho de palma (nudillo índice a nudillo meñique) ≈ 8,5 cm en un adulto. */
+const spArc=document.getElementById('spArc'), spNeedle=document.getElementById('spNeedle'), spNum=document.getElementById('spNum'),
+      spCms=document.getElementById('spCms'), spMaxEl=document.getElementById('spMax'), spState=document.getElementById('spState');
+const PALM_CM=8.5, SP_MAX_KMH=20;
+const fmt=v=>v.toFixed(1).replace('.',',');
+function drawSpeed(kmh){
+  const k=Math.min(1,kmh/SP_MAX_KMH);
+  spArc.style.strokeDashoffset=100*(1-k);
+  spNeedle.style.transform=`rotate(${-90+180*k}deg)`;
+  spNum.textContent=fmt(kmh);
+  spCms.textContent=Math.round(kmh/0.036)+' cm/s';
+}
+function speed(H,t){
+  const W=video.videoWidth,Hh=video.videoHeight;
+  const ids=[0,5,9,13,17]; let x=0,y=0;
+  for(const i of ids){x+=H[i].x*W;y+=H[i].y*Hh} x/=5;y/=5;
+  const palmPx=Math.hypot((H[5].x-H[17].x)*W,(H[5].y-H[17].y)*Hh);
+  if(palmPx<8){spPrev=null;return}
+  const cmPerPx=PALM_CM/palmPx;
+  if(spPrev){
+    const dt=(t-spPrev.t)/1000;
+    if(dt>0&&dt<0.25){
+      const cms=Math.hypot(x-spPrev.x,y-spPrev.y)*cmPerPx/dt;
+      const kmh=Math.min(60,cms*0.036);
+      spV+= (kmh-spV)*.35;
+      if(spV<0.3)spV=0;
+      if(spV>spMax){spMax=spV;spMaxEl.textContent=fmt(spMax)}
+      drawSpeed(spV);
+      spState.textContent=spV>12?'Rápido':spV>4?'Movimiento':'Quieta';
+    }
+  }
+  spPrev={x,y,t};
+}
+document.getElementById('spReset').onclick=()=>{spMax=0;spMaxEl.textContent='0,0'};
+
 function hand(t){
   if(!gesturer)return;
   const g=gesturer.recognizeForVideo(video,t);
   const H=g.landmarks&&g.landmarks[0];
-  if(!H){fistT=0;handEl.textContent='—';return}
+  if(!H){fistT=0;handEl.textContent='—';spPrev=null;spV*=.85;drawSpeed(spV);spState.textContent='Sin mano';return}
+  speed(H,t);
   const top=g.gestures[0]&&g.gestures[0][0], fist=top&&top.categoryName==='Closed_Fist'&&top.score>.6;
   mctx.fillStyle=fist?'#E63946':'#FFD60A';
   for(const q of H)mctx.fillRect(q.x*mesh.width-2.5,q.y*mesh.height-2.5,5,5);
